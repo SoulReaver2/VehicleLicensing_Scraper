@@ -1,5 +1,6 @@
+//@ts-check
 const mongoose = require("mongoose");
-require("dotenv").config();
+const { connect } = require("./src/dbconnect");
 
 const vehicleLicenseSchema = new mongoose.Schema({
   _id: Number,
@@ -63,14 +64,6 @@ const VehicleLicenseModel = mongoose.model(
   "vehicleLicense",
   vehicleLicenseSchema
 );
-
-const uri = process.env.MONGO_URI;
-
-const connect = () => {
-  return mongoose.connect(uri, {
-    dbName: "test_vercel"
-  });
-};
 
 connect()
   .then(async () => {
