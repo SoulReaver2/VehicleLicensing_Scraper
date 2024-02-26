@@ -3,6 +3,7 @@ const Scrape = require("./models/scrape");
 const Crawler = require("./services/crawler");
 const Parser = require("./services/parser");
 const Logger = require("./utils/logger");
+const Seed = require("./utils/seed");
 const config = require("./config");
 const fs = require("fs");
 const path = require("path");
@@ -10,54 +11,54 @@ const path = require("path");
 class Scraper {
   constructor() {
     this.logger = new Logger();
+    this.seedReader = new Seed(config.seedFile);
+    this.urlsToProcess = this.seedReader.readSeeds();
     this.crawler = new Crawler(this.logger);
     this.parser = new Parser();
-    this.visitedLinks = new Set();
+    this.visitedLinks = new Map();
     this.scrapes = [];
   }
 
   async start() {
-    const seedLinks = await this.readSeeds();
-
-    for (const link of seedLinks) {
-      await this.crawlLink(link, 0);
+    while (this.urlsToProcess.length > 0) {
+      const url = this.urlsToProcess.pop();
+      await this.crawlLink(url, 0);
     }
 
     this.writeScrapes();
   }
 
-  async readSeeds() {
-    const seedFile = path.join(__dirname, "..", "seed.txt");
-    const seedLinks = await fs.promises
-      .readFile(seedFile, "utf-8")
-      .then((data) => data.trim().split("\n"))
-      .catch((error) => {
-        this.logger.error(`Error reading seed file: ${error.message}`);
-        process.exit(1);
-      });
-
-    return seedLinks.filter((link) => link.trim() !== "");
-  }
-
   async crawlLink(url, depth) {
-    if (!this.isValidLink(url, depth)) {
+    if (!this.isValidLink(url)) {
+      // Write "urlstoprocess" into the seed file to exclude the invalid url from the seed
+      this.seedReader.writeSeeds(this.urlsToProcess);
       return;
     }
 
-    this.visitedLinks.add(url);
+    const { relatedLinks, data } = await this.crawler.crawl(url, depth);
 
-    const { links, data } = await this.crawler.crawl(url, depth);
-
+    /*
     const parsedData = this.parser.parse(data);
-
     this.scrapes.push(new Scrape(url, parsedData, depth));
+    */
 
-    for (const link of links) {
-      await this.crawlLink(link, depth + 1);
+    if (Object.keys(data).length === 0) {
+      this.visitedLinks.set(url, 404);
+      this.logger.info(`No data to scrape from: ${url}`);
+    } else {
+      this.logger.info(`Successfully scraped data from : ${url}`);
+      relatedLinks.forEach((url) => {
+        if (this.urlsToProcess.indexOf(url) === -1) {
+          this.urlsToProcess.unshift(url);
+        }
+      });
+      this.seedReader.writeSeeds(this.urlsToProcess);
+      // LibDb.save(vehicleLidenseData) in the database
+      this.visitedLinks.set(url, 200);
     }
   }
 
-  isValidLink(url, depth) {
+  isValidLink(url) {
     const baseUrl = new URL(config.baseUrl);
     const linkUrl = new URL(url, baseUrl);
 
@@ -70,12 +71,6 @@ class Scraper {
       this.logger.info(`Ignoring previously visited link: ${url}`);
       return false;
     }
-
-    if (depth >= config.maxDepth) {
-      this.logger.info(`Ignoring link beyond maximum depth: ${url}`);
-      return false;
-    }
-
     return true;
   }
 
@@ -93,5 +88,7 @@ class Scraper {
       });
   }
 }
+
+// how do you implement a last in first out LIFO data structure in javascript
 
 module.exports = Scraper;
