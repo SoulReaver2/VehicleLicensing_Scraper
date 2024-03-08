@@ -1,7 +1,7 @@
 class Link {
-  constructor(url, depth = 0) {
+  constructor(url, status = 404) {
     this.url = url;
-    this.depth = depth;
+    this.status = status;
   }
 
   // ...
