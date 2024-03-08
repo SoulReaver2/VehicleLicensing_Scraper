@@ -6,15 +6,16 @@ class Crawler {
     this.logger = logger;
   }
 
-  async crawl(url, depth) {
+  async crawl(url) {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
 
     // ... extract links and data from the page
 
     return {
-      links: links,
-      data: data
+      link: link,
+      data: {},
+      relatedUrls: []
     };
   }
 }
